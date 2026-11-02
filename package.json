@@ -1,0 +1,61 @@
+{
+  "name": "dsh-skin-keymark",
+  "version": "0.1.9",
+  "type": "module",
+  "description": "DSH 皮肤：静态/视频/生成式渐变壁纸 + 构图缩放平移 + 全窗铺开（侧栏与所有面板一起透出皮肤）+ 分部位透明度 + 纯字体颜色标注（只写 color，不产生任何方框）",
+  "license": "MIT",
+  "author": "Wizoiz",
+  "homepage": "https://github.com/Wizoiz/dsh-skin-keymark",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wizoiz/dsh-skin-keymark.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Wizoiz/dsh-skin-keymark/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "skin",
+    "wallpaper",
+    "theme",
+    "keymark"
+  ],
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "immediately": true
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "react": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "react": { "optional": true }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ]
+}
