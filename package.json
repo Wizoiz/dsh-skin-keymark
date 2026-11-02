@@ -1,6 +1,6 @@
 {
   "name": "dsh-skin-keymark",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "description": "DSH 皮肤：静态/视频/生成式渐变壁纸 + 构图缩放平移 + 全窗铺开（侧栏与所有面板一起透出皮肤）+ 分部位透明度 + 纯字体颜色标注（只写 color，不产生任何方框）",
   "license": "MIT",

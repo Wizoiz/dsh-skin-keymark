@@ -170,7 +170,7 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 | **生成式渐变壁纸** 8 套（极光 / 暮色 / 纸感 / 墨韵 / 弥散 / 余烬 / 深海 / 跟随主色） | dream-skin「壁纸 2.0 渐变预设」、any-background「动态生成背景」 | `GRADIENT_PRESETS` + `gradientCss()`，写进 `#…-wallpaper` 的 `background-image` | 与 `wallpaper.url` **互斥**：选渐变即清空 url，所有素材入口反向清空 `gradient`。不建 canvas、不跑 shader |
 | **渐变缓慢漂移**（42s 一循环） | any-background「动态生成背景」 | `ensureGradientRule()` 生成 `@keyframes`，只动 `background-position` | 缺省关；`prefers-reduced-motion` 时整条动画被剥掉 |
 | **构图编辑器**（缩放 100–250% + 水平/垂直平移 ±50%） | any-background「位置编辑器」 | `applyWallpaper()` 的 `transform` 链，图片/视频/渐变共用 | 纯合成器 `scale/translate`；平移用视口百分比存，窗口缩放后构图不变 |
-| **分部位透明度**（消息气泡 / 输入卡 / 菜单浮层 / 代码块 四组各一根滑条） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
+| **分部位透明度**（气泡 / 输入卡 / 菜单与面板 / 代码块 / 侧栏行 / 全局悬停 / 提示气泡与 toast，**七组**各一根滑条，覆盖全部 26 个令牌） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
 
 设计边界仍沿用既有两条铁律：**自动适配只改与素材绑定的参数**（渐变/构图属素材侧）、**运行时安全余量不落盘**（分部位系数只压缩地板以上的余量，不写可读性守卫算出的临时值）。
 
@@ -188,6 +188,33 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 - 图片壁纸时渐变规则被清空、颗粒层在渐变下仍建出、`data-we-wallpaper` 握手标记照旧写入
 
 跑法：`node tmp/skin-scan/harness2.mjs`（退出码 0 = 全绿）。
+
+## 性能与无障碍（v0.1.10 · 2026-11-02）
+
+这一轮全部是「不改外观、只减少无效工作」的改动。四条都有一条共同的判据：**改了之后，用户看得见的像素必须一模一样**。
+
+| 机制 | 原来 | 现在 | 为什么这样定 |
+| --- | --- | --- | --- |
+| 滑条拖动 | range 的 `input` 每像素一次，一次拖动上百次 `commit()`，每次都跑满 10 个引擎 | `requestAnimationFrame` 内只跑最后一次 | 一帧内画两次等于白画一次。数值框与双击复位**刻意不合并**：延迟一帧会让「点一下没反应」的错觉回来 |
+| 引擎调度 | `applyAll()` 无条件跑 10 个引擎 | 8 个按输入签名门控（`once()`），`applyWallpaper` 与 `applyTokens` 仍无条件 | 前者是 `data-we-wallpaper` 握手与轮播计时的唯一入口，后者负责铺开层的挂/拆 —— 跳过它们的代价远大于收益 |
+| 壁纸样式 | 每次 commit 重写整条 `cssText`（含 `filter` / `transform`） | 与上次完全一致时不写（`paintWallpaperEl()`） | 拿 css 字符串本身当签名：它由全部输入拼成，不需要再维护一份「哪些输入该进签名」的清单 —— 那种清单漏一项就是一个滑条失灵 |
+| 渐变规则 | 每次 commit 重写 `<style>` 文本（含 `@keyframes`） | 文本没变就不写 | 重写会让浏览器把整段 `@keyframes` 重新解析 |
+
+签名门控的两个坑，都已验证并修掉：
+
+- `orbit` 的签名曾经是 `Boolean(getElementById(WALLPAPER_ID))`。图片换视频时元素一直在，该项恒 `true`，于是指针环绕再也不会重新挂上。改为 `wpEl.tagName`（并纳入 `prefersReducedMotion()`）后，「换素材后环绕失灵」消失。
+- 内存里「上次画了什么」必须在元素被销毁时作废（`removeWallpaperEl()` 与 `ensureWallpaperEl()` 的换元素分支都会清），否则新元素拿到同样的 css 会被跳过，表现为换壁纸后白屏。
+
+**无障碍**：`prefers-reduced-transparency` 现在会真正生效。插件在 `body` 上写内联变量，内联声明压过媒体的媒体查询规则，所以宿主自己的降级对插件无效。处置不是关壁纸（那是用户的美术选择），而是只停用「全窗铺开」这一层：面板、菜单、侧栏行回到不透明底板，画布仍按不透明度透出壁纸。系统设置变化时实时生效（`matchMedia` 的 `change` 监听），卸载时正确拆除。
+
+验证（`tmp/km-*.mjs`，均从源码抽出真实函数后注入桩，不复刻逻辑）：
+
+| 脚本 | 断言 |
+| --- | --- |
+| `km-coverage.mjs` | `SURFACE_GROUPS` 7 组、`CONTENT_TOKENS` 26 项、无遗漏无多余 |
+| `km-applyall.mjs` | 40 次 commit 的引擎调用数：`wallpaper`/`tokens` 各 40，其余各 1，总计 88（未门控为 400）；面板后建、图片转视频、卸载重挂三个场景均重新执行 |
+| `km-paint.mjs` | 同一元素同一 css 只写 1 次；换元素或 `forget()` 后必定重写；40 次相同绘制 → 1 次真实写入 |
+| `km-sigs.mjs` | 同签名跳过、变化重跑、`resetApplySigs()` 后重跑；全 `false` 的签名不会被当哨兵 |
 
 ## 构建与清理
 
