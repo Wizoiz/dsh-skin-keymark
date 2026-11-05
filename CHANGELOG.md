@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.13 — 2026-11-05
+
+接管「菜单从哪来」这一整片：菜单面层用的不是 `--dsw-alias-*`，而是 `--dsw-menu-surface-fill`；浮层以前会跟着地板系数一起塌到和正文同透；设置页那块亚克力底是写死的 0.38。
+
+### Added
+
+- **`--dsw-menu-surface-fill` 纳入管控（令牌 29 → 30）**。前缀是 `--dsw-menu-` 而非 `--dsw-alias-`，按 alias 名字空间扫描时整片漏掉。宿主 `_material_ri079_21` 直接 `background:var(--dsw-menu-surface-fill)`，默认值写死 `#43454a73`（深）/ `#f8f9fa94`（浅）—— 不接管就是一块与壁纸无关的灰玻璃。地板：铺开 0.72、非铺开 0.94、抬升 0.03，并入 `menu` 分组。
+- **`FLOATING_FLOOR` 硬地板（7 项）**。菜单、下拉、提示气泡、toast、菜单键帽压在正文之上，背后没有「自己那块半透明画布」可借：地板系数降到 0 时面板塌到画布 alpha 是对的，浮层塌到 0.08 会让背后的列表透上来叠成乱码。这张表不乘 `floorScale`，是物理下限而非美术参数；分部位系数仍乘在最后。值：`specific-menu` / `specific-selector` / `menu-surface-fill` 0.72，`specific-tip` 0.80，`tooltip-bg` 0.86，`tooltip-key-bg` 0.62，`toast-bg` 0.82。
+
+### Changed
+
+- **设置页亚克力底跟画布走**。`FROST_OVERLAY_ALPHA` 原写死 0.38、遮罩写死 0.34，叠起来让 `AnXs9G_nav`（本身一直透明）看起来像实底。改为 `ovAlpha = clamp(alpha + 0.12, 深 0.12 / 浅 0.10, 深 0.50 / 浅 0.58)`、`maskAlpha = clamp(alpha + 0.06, 0.06, 深 0.34 / 浅 0.24)`：壁纸越透这层玻璃越透，但仍永远比画布实一档。
+- 浮层的 `floorScale` 独立后，「面板地板强度」滑条拉到 0 时，面板与画布同透而浮层仍保底 —— 以前这两者被同一个系数拖着一起塌。
+
+### Fixed
+
+- **设置页亚克力变量被写成非法值**。初版用 `toRgba(ovBase, ovAlpha)`，但 `ovBase` 是 `"30,30,33"` 逗号三元组、不是 CSS 颜色，`toRgba()` 原样返回 ⇒ 变量里留下 `30,30,33`，浏览器把整条 `background-color:var(...)` 丢掉（表现为「改了没反应」）。改为手写 `"rgba(" + ovBase + "," + ovAlpha.toFixed(3) + ")"`。
+- `FLOATING_FLOOR` 定义后一度没被读取（死常量），现已接入 `applyTokens()` 的铺开与非铺开两条分支。
+
+### Known limitation
+
+- 壁纸素材在左侧 280px 接近纯黑时（暗背景人像），侧边栏即便完全透明也看不出皮肤 —— 把 `_frame`/`_sidebarCol` 底色强制 `transparent` 后采样仍是 `[0,0,0]`。这是素材没有亮度可透，不是透明度公式缺陷。
+
 ## 0.1.12 — 2026-11-05
 
 把「插件管不到的地方」补齐：设置面板、导航行、输入框、账号/模型页的卡片网格，全部纳入同一套显隐公式。可见像素与 0.1.11 的区别只在透明强度大于 0 时出现 —— 这些表面以前是恒定实心，现在会跟着画布一起变淡。

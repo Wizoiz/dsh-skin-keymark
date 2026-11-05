@@ -177,7 +177,7 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 | **生成式渐变壁纸** 8 套（极光 / 暮色 / 纸感 / 墨韵 / 弥散 / 余烬 / 深海 / 跟随主色） | dream-skin「壁纸 2.0 渐变预设」、any-background「动态生成背景」 | `GRADIENT_PRESETS` + `gradientCss()`，写进 `#…-wallpaper` 的 `background-image` | 与 `wallpaper.url` **互斥**：选渐变即清空 url，所有素材入口反向清空 `gradient`。不建 canvas、不跑 shader |
 | **渐变缓慢漂移**（42s 一循环） | any-background「动态生成背景」 | `ensureGradientRule()` 生成 `@keyframes`，只动 `background-position` | 缺省关；`prefers-reduced-motion` 时整条动画被剥掉 |
 | **构图编辑器**（缩放 100–250% + 水平/垂直平移 ±50%） | any-background「位置编辑器」 | `applyWallpaper()` 的 `transform` 链，图片/视频/渐变共用 | 纯合成器 `scale/translate`；平移用视口百分比存，窗口缩放后构图不变 |
-| **分部位透明度**（气泡 / 输入卡 / 菜单与面板 / 代码块 / 侧栏行 / 全局悬停 / 提示气泡与 toast，**七组**各一根滑条，覆盖全部 29 个令牌） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
+| **分部位透明度**（气泡 / 输入卡 / 菜单与面板 / 代码块 / 侧栏行 / 全局悬停 / 提示气泡与 toast，**七组**各一根滑条，覆盖全部 30 个令牌） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
 ### 设置页与输入框也在管控范围内
 
 设置面板、导航行、输入框、账号/模型页的卡片网格，全部走同一套显隐公式 —— 没有「插件管不到的地方」。这里有三层机制，缺一层就会出现一块实心色：
@@ -186,9 +186,26 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 | --- | --- | --- |
 | 设置面板本体、导航行、悬停态 | `--dsw-alias-bg-layer-2`、`--dsw-specific-sidebar-nav-item-active/-hover`、`--dsw-alias-interactive-bg-hover` | 这几个本来就是插件已覆盖的 26 个令牌之一，无需额外处理 |
 | 输入框（含设置页里的文本框、下拉、搜索框） | `--dsw-alias-bg-layer-1` | 全库 `input`/`textarea` 规则的底色只有五种，其余四种是状态色与描边色（不该透明化），只有 `bg-layer-1` 是真正的填充 |
+| 菜单 / 下拉 / 右键菜单的面层 | `--dsw-menu-surface-fill` | 它的前缀是 `--dsw-menu-` 而不是 `--dsw-alias-`，按 alias 名字空间扫会整片漏掉。宿主 `_material_ri079_21` 直接 `background:var(--dsw-menu-surface-fill)`，默认值写死 `#43454a73`（深）/`#f8f9fa94`（浅）——不接管就是一块与壁纸无关的灰玻璃 |
 | 设置页功能区卡片、引导卡 | `--dsw-alias-settings-card-fill`、`--dsw-alias-onboarding-card-fill`、`--dsw-alias-onboarding-secondary-fill` | 宿主把它们声明成 `var(--dsw-alias-bg-layer-2)` 这类**别名**，而 `var()` 在**声明处**就替换完成 —— 插件写 layer-2 的透明值继承不到这里，卡片会一直是实心块。只能直接写别名令牌本身 |
 
 地板值不是拍脑袋定的：卡片坐在 layer-2 面板（铺开态 0.33）之上，所以给 0.36 —— 比面板实一档，否则卡片和面板会成为同一块无边界色面；引导副卡在主卡内部，给 0.28，靠这 0.05 的差值才看得出嵌套。非铺开态三者分别 0.95 / 0.95 / 0.93，与 layer-1..3 同档（它们承载表单标签与小号说明文字）。抬升量沿用 layer-2 的 0.05：宿主本就把它定义成 layer-2 的别名，抬升不一致会让卡片在铺开时比所在面板还淡，边界消失。
+
+### 浮层不吃地板系数（`FLOATING_FLOOR`）
+
+分部位地板有一个例外表：菜单、下拉、提示气泡、toast、菜单键帽。它们压在正文文字**之上**，背后没有「自己那块半透明画布」可借 —— 地板系数降到 0 时，面板塌到画布 alpha 是对的（面板背后正是那层画布），浮层塌到 0.08 却会让后面的会话列表直接透上来，和菜单文字叠成乱码。所以这张表**不乘 `floorScale`**，是物理下限而非美术参数；分部位系数仍乘在最后，用户想压淡照样压得动。
+
+值：`--dsw-specific-menu` / `--dsw-specific-selector` / `--dsw-menu-surface-fill` 0.72，`--dsw-specific-tip` 0.80，`--dsw-alias-tooltip-bg` 0.86，`--dsw-alias-tooltip-key-bg` 0.62，`--dsw-alias-toast-bg` 0.82。提示气泡给得最高（它只包一两行字、底下全是正文），菜单键帽给得最低（它本身就在气泡内部，靠差值才看得出是一个按键）。
+
+### 设置页那块亚克力底跟画布走
+
+设置页「左列看起来是实底」曾经不是导航列的问题：`AnXs9G_nav` 一直是 `rgba(0,0,0,0)`，实底感来自插件自己的 frost 层 —— `FROST_OVERLAY_ALPHA` 写死 0.38，再叠上遮罩的 0.34。现在两者都跟着画布 alpha 走：`ovAlpha = clamp(alpha + 0.12, 深 0.12 / 浅 0.10, 深 0.50 / 浅 0.58)`，`maskAlpha = clamp(alpha + 0.06, 0.06, 深 0.34 / 浅 0.24)`。壁纸越透，设置页这层玻璃也跟着越透，但仍永远比画布实一档（它有 800×800 的内容要读）。
+
+写这两个变量时不能过 `toRgba()`：`ovBase` 是 `"30,30,33"` 这样的逗号三元组、不是 CSS 颜色，`toRgba()` 会原样返回，结果变量里留下非法值 `30,30,33`，浏览器把整条 `background-color:var(...)` 声明丢掉 —— 表现为「改了没反应」。必须手写 `"rgba(" + ovBase + "," + ovAlpha + ")"`。
+
+### 侧边栏在纯黑区域看不出皮肤（不是 bug）
+
+把 `mP3x-q_frame` 与 `mP3x-q_sidebarCol` 的底色强制 `transparent !important` 再采样：左侧 x=20/150 处仍是 `[0,0,0]`，同高度右侧 x=700 处是 `[200,191,189]`。原因是**素材本身**在那里接近纯黑（黑发/暗背景），没有亮度可以透出来。想在那块区域看到皮肤，只能给侧栏自己的底色加提亮或模糊，透壁纸是透不出来的。
 
 **冲突时插件胜出**：`dsh-claude-style` 会在 `body[data-dsh-claude-style][data-dsh-claude-palette=claude]…` 这类长选择器上重声明 `--dsw-alias-bg-layer-1/2/3`、`--dsw-alias-bg-base`、`--dsw-specific-sidebar-fill`、`--dsw-specific-input-major`（各 4 处）。它挂在**元素级**，而插件写的是 `body` 的 **inline 声明** —— 同一元素上 inline 层优先级更高，所以这些令牌最终取插件值，不需要 `!important` 也不需要更长的选择器。
 
