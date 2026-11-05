@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.12 — 2026-11-05
+
+把「插件管不到的地方」补齐：设置面板、导航行、输入框、账号/模型页的卡片网格，全部纳入同一套显隐公式。可见像素与 0.1.11 的区别只在透明强度大于 0 时出现 —— 这些表面以前是恒定实心，现在会跟着画布一起变淡。
+
+### Added
+
+- **设置页功能区卡片纳入管控**：新增 `--dsw-alias-settings-card-fill`。宿主在 theme 包里把它声明成 `var(--dsw-alias-bg-layer-2)`，而 `var()` 在**声明处**就替换完成 —— 插件写 layer-2 的透明值继承不到这里，所以设置页账号/模型/插件市场/外观预设的整片卡片网格一直是实心块。只能直接写别名令牌本身。地板：非铺开 0.95（与 layer-1..3 同档，它承载表单标签与小号说明文字）、铺开 0.36（坐在 layer-2 面板 0.33 之上，必须高过它才保住「卡片 / 面板」两级层次）、抬升 0.05（沿用 layer-2 的抬升量 —— 宿主本就把它定义成 layer-2 的别名，抬升不一致会让卡片在铺开时比所在面板还淡，边界消失）。
+- **引导卡两层**：`--dsw-alias-onboarding-card-fill`（0.95 / 0.33 / 抬升 0.03）与 `--dsw-alias-onboarding-secondary-fill`（0.93 / 0.28 / 抬升 0.02）。副卡在主卡内部，全靠这点 floor 差值才看得出嵌套。
+- **面板全局令牌 26 → 29**：三个新令牌全部并入 `menu` 分组（用户眼里它们就是「面板里的一块面」），因此直接受「菜单 / 面板」那根分部位滑条控制，不需要新增第七组之外的控件。覆盖率断言同步到 29/29。
+
+### Changed
+
+- **输入框确认无需新增令牌**：全库 `input`/`textarea` 规则的 `background` 只有五种 —— `--dsw-alias-bg-layer-1`（真正的填充）、`--dsw-alias-bg-layer-3`、`--dsw-alias-state-success-primary`、`--dsw-alias-brand-primary`、`--dsw-alias-border-l1`。前两种已是覆盖项，后三种是状态色与描边色（透明化会让勾选态、按钮、边框一起失真），故不动。
+- **玻璃不叠两层**：设置页遮罩用的是 `--dsw-alias-bg-mask-1`（插件铺开态地板 0.30，已覆盖）；`--dsw-mask-blur` 默认 `none`，且设置页内嵌态下插件的 `backdrop-filter` 已由 `applyAcrylic()` 的 hosted 早退关闭（见 0.1.11「入口」）。
+
+### Fixed
+
+- **`SURFACE_GROUPS` 漏掉新令牌导致覆盖率断言失败**：首次只把 `--dsw-alias-settings-card-fill` 并进 `menu` 组，随后追加的两个 onboarding 令牌没跟进去，`km-coverage` 报 `CONTENT_TOKENS: 29 | distinct grouped: 27` → `missing: ["--dsw-alias-onboarding-card-fill","--dsw-alias-onboarding-secondary-fill"]` → `COVERAGE_FAIL`。补齐后 29/29 通过。
+
 ## 0.1.11 — 2026-11-05
 
 两批改动：① 遮挡门控（不改外观，可见像素与 0.1.10 一致）；② 入口从侧栏底部按钮迁到设置页，面板九个分区合并成四个。滑条值与壁纸像素都不变，变的是「去哪儿调」。

@@ -177,7 +177,22 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 | **生成式渐变壁纸** 8 套（极光 / 暮色 / 纸感 / 墨韵 / 弥散 / 余烬 / 深海 / 跟随主色） | dream-skin「壁纸 2.0 渐变预设」、any-background「动态生成背景」 | `GRADIENT_PRESETS` + `gradientCss()`，写进 `#…-wallpaper` 的 `background-image` | 与 `wallpaper.url` **互斥**：选渐变即清空 url，所有素材入口反向清空 `gradient`。不建 canvas、不跑 shader |
 | **渐变缓慢漂移**（42s 一循环） | any-background「动态生成背景」 | `ensureGradientRule()` 生成 `@keyframes`，只动 `background-position` | 缺省关；`prefers-reduced-motion` 时整条动画被剥掉 |
 | **构图编辑器**（缩放 100–250% + 水平/垂直平移 ±50%） | any-background「位置编辑器」 | `applyWallpaper()` 的 `transform` 链，图片/视频/渐变共用 | 纯合成器 `scale/translate`；平移用视口百分比存，窗口缩放后构图不变 |
-| **分部位透明度**（气泡 / 输入卡 / 菜单与面板 / 代码块 / 侧栏行 / 全局悬停 / 提示气泡与 toast，**七组**各一根滑条，覆盖全部 26 个令牌） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
+| **分部位透明度**（气泡 / 输入卡 / 菜单与面板 / 代码块 / 侧栏行 / 全局悬停 / 提示气泡与 toast，**七组**各一根滑条，覆盖全部 29 个令牌） | any-background「分部位界面透明度」 | `SURFACE_GROUPS` + `surfaceScaleFor()`，在 `applyTokens()` 里按组系数**乘**在该令牌的不透明度上 | 存的是 **0.2–1 的系数**而非绝对值。刻意**不再套第二层地板**：系数 100% 时逐字等于旧行为，往下一律更透；再钳一次会让高地板组（菜单 0.92）的滑条在任何总强度下都拖不动 —— 又一根死控件。`总强度=0 且系数=1` 时直接归还宿主值，不写恒定声明 |
+### 设置页与输入框也在管控范围内
+
+设置面板、导航行、输入框、账号/模型页的卡片网格，全部走同一套显隐公式 —— 没有「插件管不到的地方」。这里有三层机制，缺一层就会出现一块实心色：
+
+| 表面 | 靠什么透出 | 为什么只能这么做 |
+| --- | --- | --- |
+| 设置面板本体、导航行、悬停态 | `--dsw-alias-bg-layer-2`、`--dsw-specific-sidebar-nav-item-active/-hover`、`--dsw-alias-interactive-bg-hover` | 这几个本来就是插件已覆盖的 26 个令牌之一，无需额外处理 |
+| 输入框（含设置页里的文本框、下拉、搜索框） | `--dsw-alias-bg-layer-1` | 全库 `input`/`textarea` 规则的底色只有五种，其余四种是状态色与描边色（不该透明化），只有 `bg-layer-1` 是真正的填充 |
+| 设置页功能区卡片、引导卡 | `--dsw-alias-settings-card-fill`、`--dsw-alias-onboarding-card-fill`、`--dsw-alias-onboarding-secondary-fill` | 宿主把它们声明成 `var(--dsw-alias-bg-layer-2)` 这类**别名**，而 `var()` 在**声明处**就替换完成 —— 插件写 layer-2 的透明值继承不到这里，卡片会一直是实心块。只能直接写别名令牌本身 |
+
+地板值不是拍脑袋定的：卡片坐在 layer-2 面板（铺开态 0.33）之上，所以给 0.36 —— 比面板实一档，否则卡片和面板会成为同一块无边界色面；引导副卡在主卡内部，给 0.28，靠这 0.05 的差值才看得出嵌套。非铺开态三者分别 0.95 / 0.95 / 0.93，与 layer-1..3 同档（它们承载表单标签与小号说明文字）。抬升量沿用 layer-2 的 0.05：宿主本就把它定义成 layer-2 的别名，抬升不一致会让卡片在铺开时比所在面板还淡，边界消失。
+
+**冲突时插件胜出**：`dsh-claude-style` 会在 `body[data-dsh-claude-style][data-dsh-claude-palette=claude]…` 这类长选择器上重声明 `--dsw-alias-bg-layer-1/2/3`、`--dsw-alias-bg-base`、`--dsw-specific-sidebar-fill`、`--dsw-specific-input-major`（各 4 处）。它挂在**元素级**，而插件写的是 `body` 的 **inline 声明** —— 同一元素上 inline 层优先级更高，所以这些令牌最终取插件值，不需要 `!important` 也不需要更长的选择器。
+
+刻意**没有**收 `--dsw-alias-bg-skeleton`（骨架屏）：它是 `#ffffff14` 这类「半透明微光」，插件写进去的是 base 色 + 不透明度，语义不同 —— 收进来只会把加载占位从一层薄光变成一块实色方块。
 
 设计边界仍沿用既有两条铁律：**自动适配只改与素材绑定的参数**（渐变/构图属素材侧）、**运行时安全余量不落盘**（分部位系数只压缩地板以上的余量，不写可读性守卫算出的临时值）。
 
