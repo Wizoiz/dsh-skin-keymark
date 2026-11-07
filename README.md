@@ -60,7 +60,7 @@
 | --- | --- | --- | --- |
 | **面板毛玻璃** 0–40px | 「外观」分区 → 「文字」小节 | `ui.glass.blur` | 设置页里那块面板的 `backdrop-filter`；在设置页内嵌态下刻意不生效（见下文「入口」），只在独立预览时可见 |
 | **玻璃通透度** 0–100% | 同上 | `ui.glass.tint` | 玻璃底色透明度；越低越透 |
-| **模糊（画面模糊）** 0–60px | 「壁纸」分区，与暗化/对比度/饱和度并列 | `wallpaper.blur` | 只模糊壁纸画面本身，不动应用任何表面 |
+| **模糊（画面模糊）** 0–60px | 「壁纸」分区，与暗化/对比度/饱和度并列 | `wallpaper.blur` | 只模糊壁纸画面本身，不动应用任何表面；**1px 及以下不下发**（见下文「模糊死区」） |
 
 设计上刻意不做「一键亚克力预设」：一个按钮同时改两边，正是把两套特效绑在一起。每个滑条双击标签即可单独复位。
 
@@ -202,6 +202,37 @@ DSH Desktop 每次启动把 web server 绑到 OS 随机端口（`port: 0`），o
 设置页「左列看起来是实底」曾经不是导航列的问题：`AnXs9G_nav` 一直是 `rgba(0,0,0,0)`，实底感来自插件自己的 frost 层 —— `FROST_OVERLAY_ALPHA` 写死 0.38，再叠上遮罩的 0.34。现在两者都跟着画布 alpha 走：`ovAlpha = clamp(alpha + 0.12, 深 0.12 / 浅 0.10, 深 0.50 / 浅 0.58)`，`maskAlpha = clamp(alpha + 0.06, 0.06, 深 0.34 / 浅 0.24)`。壁纸越透，设置页这层玻璃也跟着越透，但仍永远比画布实一档（它有 800×800 的内容要读）。
 
 写这两个变量时不能过 `toRgba()`：`ovBase` 是 `"30,30,33"` 这样的逗号三元组、不是 CSS 颜色，`toRgba()` 会原样返回，结果变量里留下非法值 `30,30,33`，浏览器把整条 `background-color:var(...)` 声明丢掉 —— 表现为「改了没反应」。必须手写 `"rgba(" + ovBase + "," + ovAlpha + ")"`。
+
+### 模糊死区：1px 不下发
+
+滑条保留 0–60 的连续档位，但 **1.5px 以下一律不写进 `filter`**（`BLUR_DEAD_ZONE = 1.5`，`applyWallpaper` 里先 `blurPx = blur < BLUR_DEAD_ZONE ? 0 : blur` 再拼链）。
+
+依据是一次定格 A/B：同一视频帧、同一裁剪区（860×780），拉普拉斯方差
+
+| filter | lapVar | 相对无模糊 |
+| --- | --- | --- |
+| `saturate(1.01) brightness(0.873)`（无 blur） | 905.3 | 基准 |
+| `saturate(1.01) blur(1px) brightness(0.873)` | 757.7 | **−16.3%** |
+| `blur(2px)` | 741.6 | −18.1% |
+
+也就是说 1px 已经付掉九成的清晰度代价，换来的却是肉眼不可见的柔化；2px 才第一次出现可见差异。同时验证了**不是**叠加遮罩造成：把 `.mP3x-q_centerCol` 与 `.an3WzG_root` 的底色强制透明后 lapVar 是 1116.3，与 baseline 1119.5 几乎相同。
+
+控件下方常驻一行说明「1px 及以下不下发：看不出糊，只掉清晰度」，避免被读成「选了 1 没反应是坏了」。
+
+### 原生下拉弹层：`color-scheme` + 不透明 option
+
+面板里的十来个下拉都是原生 `<select class="km-input">`。收起态由 `.km-input` 的底色撑住，看起来正常；**展开的弹层由浏览器/OS 自己绘制**，只认 option 自己的 `background-color` 与 `color-scheme`，拿不到父级那层 8% 半透明背景的合成结果 —— 于是退化成平台白底，而 `color:inherit` 带来的浅色字仍在，就成了「浅底浅字几乎看不清」。
+
+修法两层：给面板声明 `color-scheme`（连弹层底色、滚动条、选中高亮、边框一起拉进对应明暗），再给 `option` 显式不透明实色。浅色判定用 `body:not([data-ds-dark-theme])`。
+
+```css
+#dsh-skin-keymark-panel{color-scheme:dark}
+#dsh-skin-keymark-panel option{background-color:#1e1e21;color:#e8eaed}
+#dsh-skin-keymark-panel option:checked{background-color:#2a3a52;color:#e8eaed}
+body:not([data-ds-dark-theme]) #dsh-skin-keymark-panel{color-scheme:light}
+body:not([data-ds-dark-theme]) #dsh-skin-keymark-panel option{background-color:#ffffff;color:#1a1c1f}
+body:not([data-ds-dark-theme]) #dsh-skin-keymark-panel option:checked{background-color:#dbe7ff;color:#1a1c1f}
+```
 
 ### 侧边栏在纯黑区域看不出皮肤（不是 bug）
 
