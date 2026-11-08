@@ -234,6 +234,43 @@ body:not([data-ds-dark-theme]) #dsh-skin-keymark-panel option{background-color:#
 body:not([data-ds-dark-theme]) #dsh-skin-keymark-panel option:checked{background-color:#dbe7ff;color:#1a1c1f}
 ```
 
+### 第三方浮层面板的地板（`--km-float-fill`）
+
+皮肤把 `--dsw-alias-bg-layer-2` 压到 8% 之后，**吃这个令牌的第三方浮层会整块透成玻璃**。实测两个受害者都在 `dsh-go-workspace`（DSHarness Go 互联插件 0.6.4-desktop.14）：
+
+```css
+/* 它的底板就是 layer-2，铺开模式下被压到 rgba(22,22,22,0.08) */
+.dsh-mobile-control__panel{background:var(--dsw-alias-bg-layer-2,#fff)}
+.dsh-mobile-control__provider-info-popover{background:var(--dsw-alias-bg-layer-2,#fff)}
+```
+
+对照：`usg_panel`（`@ychris12138/dsh-usage-stats`）吃的是 `--dsw-specific-menu`，已有 0.72 地板 + 宿主 40px 菜单模糊，观感就是那块「纯黑毛玻璃」，**不需要再补**；`tqdCrG_drawer`（`dsh-lowtide`）走 `--dsw-specific-tip`（0.55），也不至于透到看不清字。
+
+所以只给这两项单开一张表，用**精确类名**而不是 `[class*="__panel"]` —— 双下划线在 BEM 里太常见，宽匹配会误伤内容卡片：
+
+```js
+const FROST_FLOAT_TARGETS = [
+  '[class*="dsh-mobile-control__panel"]',
+  '[class*="dsh-mobile-control__provider-info-popover"]',
+];
+```
+
+它们复用浮层那套亚克力（`blur(20px) saturate(1.7) brightness(1.06)`，比设置页的 14px 高 6px —— 浮层面积更小、背后文字更密），但底色用**独立变量** `--km-float-fill`：
+
+- `--km-frost-ov-tint` 是设置页的底色，那里背后是自己那块半透明画布，0.2 就够；
+- 浮层悬在正文之上，没有同 alpha 的底板可借，所以自带地板：`floatAlpha = clamp(0.62 + tint * 0.16 + alpha * 0.08, 0.62, 0.96)`。**地板恒 ≥0.62**，画布 alpha 只在窄区间微微推动它。
+
+真机实测（`KM_BASE=http://127.0.0.1:10811`，点开互联面板后读 `getComputedStyle`）：
+
+| 项 | 值 |
+| --- | --- |
+| `.dsh-mobile-control__panel` 的 `background-color` | `rgba(30, 30, 33, 0.682)` |
+| 同元素 `backdrop-filter` | `blur(20px) saturate(1.7) brightness(1.06)` |
+| `body --km-float-fill` | `rgba(30, 30, 33, 0.682)` |
+| `body --km-frost-ov-tint`（设置页，作对照） | `rgba(30, 30, 33, 0.200)` |
+
+「面板毛玻璃 / 玻璃通透度」两根滑条会自动一起控制这批浮层 —— 调一次，设置页与第三方浮层同步变化，不新增第五根滑条。
+
 ### 侧边栏在纯黑区域看不出皮肤（不是 bug）
 
 把 `mP3x-q_frame` 与 `mP3x-q_sidebarCol` 的底色强制 `transparent !important` 再采样：左侧 x=20/150 处仍是 `[0,0,0]`，同高度右侧 x=700 处是 `[200,191,189]`。原因是**素材本身**在那里接近纯黑（黑发/暗背景），没有亮度可以透出来。想在那块区域看到皮肤，只能给侧栏自己的底色加提亮或模糊，透壁纸是透不出来的。

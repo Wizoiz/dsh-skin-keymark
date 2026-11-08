@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.16 — 2026-11-08
+
+第三方插件的浮层面板不再被铺开模式透视。此前只治了宿主自己的浮层，第三方插件吃 `--dsw-alias-bg-layer-2` 的那些一个都没管。
+
+### Added
+
+- 新增 `FROST_FLOAT_TARGETS`，把 `dsh-go-workspace` 的 `__panel` 与 `__provider-info-popover` 纳入浮层亚克力。用精确类名而非 `[class*="__panel"]`：双下划线在 BEM 里太常见，宽匹配会误伤内容卡片。
+- 新增独立变量 `--km-float-fill`（地板 0.62，上限 0.96），与设置页的 `--km-frost-ov-tint`（0.20 起）分开 —— 设置页背后是自己那块半透明画布，浮层悬在正文之上、没有同 alpha 底板可借。
+- 浮层用 `blur(20px)`（`FROST_OVERLAY_BLUR + 6`）：面积更小、背后文字更密，14px 不够。
+
+### Changed
+
+- `frostCss()` 多产出一条 `floatSel` 规则，选择器以 `body[data-km-frost]` 为前缀，与既有 layer 规则同层。
+
+### Fixed
+
+- 左下角「DSHarness Go 互联插件」面板在铺开模式下整块透成玻璃、背后会话列表压上来 —— 现在底板 `rgba(30,30,33,0.682)` + `blur(20px)`。
+
+### Known limitation
+
+- 只覆盖这两个类名。第三方插件若用别的背景令牌（如 `--dsw-alias-fill-l1`）或写死色值，仍不受管控；新增受害插件需要往 `FROST_FLOAT_TARGETS` 里补一项。
+
 ## 0.1.15 — 2026-11-07
 
 两处「看起来像 bug、其实是收支不成立」的修正：1px 模糊白掉清晰度，原生下拉弹层在深色界面里变成白底。
