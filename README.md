@@ -456,6 +456,33 @@ const spread = state.ui.spread === true && !prefersReducedTransparency();
 2. **要人看见的反馈，写之前先展开自己。** `revealGroupOf(node)` 找到包含该节点的组，摘掉成员的 `data-km-grphide`、把组头设成展开态。它**只临时让路**，不改 `groupAuto` 偏好 —— 用户没点过，就不该被记成「他自己展开的」。
 3. **折叠只打属性、不搬节点。** 搜索索引按 `.km-field` / `.km-row` 抓单元；把成员搬进 `<details>` 之类的独立容器，索引与真实可见性就对不上了。同理折叠时**只藏成员、标题永远留着**，否则收起之后点不回来。
 
+### 设计系统：先立令牌，再重画零件（v0.1.24）
+
+0.1.22 与 0.1.23 都在改结构 —— 页签、分组折叠、高度。结构对了，皮还是逐年攒出来的：控件 28px、圆角 7~9px 一把梭、开关是原生 `<input type=checkbox>`（15×15 小方块）、分区之间只有一条 `border-bottom`。
+
+这一版的做法是**先立一层令牌，再拿它重画每个部件**，并且把整节新规则**追加在 `PANEL_CSS` 最后**、与旧规则同特异性 —— 靠「后写者胜」覆盖，旧行一行没删。要回滚只需要删掉这一节，不必逐条反推。
+
+```css
+--km-surface / --km-subtle / --km-border / --km-text / --km-muted / --km-faint / --km-accent
+--km-card / --km-hover
+--km-r-card:14px  --km-r-ctrl:10px  --km-r-tiny:6px  --km-h-ctrl:36px
+--km-t-color:180ms  --km-t-move:240ms  --km-ease:cubic-bezier(.2,.8,.2,1)
+```
+
+每个令牌都是三级回落：先试宿主设置页的 `--dsh-settings-*`，取不到再试 `--dsw-alias-*`，最后才是字面量。这样做的好处是深浅色跟着宿主走 —— 旧版里那些硬编码的 `rgba(255,255,255,.1)` 在浅色主题下等于一条看不见的边。
+
+**控件高度取 36px，不是参考实现的 44px。** 44px 是标准触摸目标，但它整个设置页没有宽度上限；这里是个 364px 的抽屉，44px 会让「选择图片 / 视频」和「清除壁纸」挤成两行。36px 是一排三按钮还能看的上限，且已经比旧的 28px 高。
+
+**开关不能用伪元素画圆点。** `input` 是替换元素，Chromium 不渲染它上面的 `::after`。改成 `radial-gradient` 画在背景上、靠 `background-position` 从 `1px` 滑到 `19px`，选中时底色走 accent 再加一圈 `0 0 12px` 柔光。
+
+**折叠箭头返工了两次，两次都是「被后面的规则盖回去」。**
+
+1. 第一版沿用 `▾` 字形。真机 `getBoundingClientRect()` 量出来只有 **4×9px** —— 9px 字号下糊成一个点，各平台字形宽度还不一致。改成两条边框拼的方角：`border-right` + `border-bottom` + `border-radius:1px` + `rotate(45deg)`，文字用 `font-size:0` 藏掉（DOM 不动，`aria-hidden` 照旧）。
+2. 第二版看着还是「斜的小三角」。读数发现 `fontSize` 是 `9px` 而不是 `0px` —— 同一节里后面还有一条 `.km-grpchev{font-size:9px}` 把隐藏字号的规则盖了回去，`▾` 字形重新显示，和边框箭头叠在一起。修法是那条只写 `opacity`。
+3. 收起态还踩了特异性：旧的 `[data-collapsed="true"] .km-sec-chevron{transform:rotate(-90deg)}` 比新规则高一档，靠后写者胜压不住，会在 45° 上再叠一个 -90°。现在用**同等特异性**重写收起态为 `rotate(-45deg)`（展开 45° − 90°）。
+
+**实测（`tmp\km-0122.mjs` 12 项全绿，`KM0122_PASS`）**：面板 `w=364 / radius=18px / fs=13px`；页签条 `h=42 / br=12px`，三个页签各 `w=107 / h=32 / fs=12.5px`；分区卡片 `w=339 / br=14px / border=1px`；开关 `w=40 h=23`、`background-position:19px 50%`。高度 `bodyScroll 845 = bodyClient 845` —— 比 0.1.23 的 889 又少 44px：卡片内边距变大了，但分组折叠把这些多出来的高度抵掉了。
+
 ## 性能与无障碍（v0.1.10 · 2026-11-02）
 
 这一轮全部是「不改外观、只减少无效工作」的改动。四条都有一条共同的判据：**改了之后，用户看得见的像素必须一模一样**。

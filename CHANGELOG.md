@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.24 — 2026-11-20
+
+0.1.22 和 0.1.23 都在改**结构**：页签、折叠、高度。结构对了，皮还是自己攒的那套 —— 28px 控件、7~9px 圆角一把梭、原生 `<input type=checkbox>`、分区之间只有一条分隔线。这一版只做**视觉**：先把一套令牌立起来，再拿它重画每个部件，一行旧规则都没删。
+
+参考实现是 `AumiSatori/dsh-ui-beautify` 的面板（同生态位的竞品）。做法不是「看起来像」，而是把它的设计系统拆出来照抄尺度：卡片 14px 圆角 + 20px 内边距、控件 44px 触摸目标、页签条 12px 圆角套 9px 圆角按钮、`:active{transform:scale(.94)}`、`180ms` 颜色 / `240ms cubic-bezier(.2,.8,.2,1)` 位移、每个组件都带 reduced-motion 与 forced-colors 降级。
+
+### Changed
+
+- **令牌层。** 面板上挂一组 `--km-*`：`surface` / `subtle` / `border` / `text` / `muted` / `faint` / `accent` / `card` / `hover`，外加 `--km-r-card:14px` `--km-r-ctrl:10px` `--km-r-tiny:6px` `--km-h-ctrl:36px` `--km-t-color:180ms` `--km-t-move:240ms` `--km-ease`。每个令牌都先试宿主设置页的 `--dsh-settings-*`，取不到才回落 `--dsw-alias-*` 再回落字面量 —— 深浅色跟着宿主走，自己不再硬编码 `rgba(255,255,255,.1)` 这类值。深色下只覆写两条：卡片底降到 68%、hover 升到 10%。
+- **控件高度 28 → 36px。** 参考实现在 44px，但它整个设置页没有宽度上限；这个面板是 364px 抽屉，44px 会让「选择图片 / 视频」和「清除壁纸」挤成两行。36px 是一排三按钮还能看的上限。
+- **分区卡片化。** 原来是 `.km-sec{padding:10px 0;border-bottom:1px}`，四个分区靠一条分隔线串成一列。现在 `.km-body` 变成 `flex column + gap:10px`，每个分区是一张 `padding:14px;border:1px;border-radius:14px` 的卡片。内嵌到宿主设置页（`[data-hosted="true"]`）时去掉边框与背景 —— 那里宿主自己已经有卡片。
+- **开关自绘。** 原生 checkbox（15×15 小方块）换成 40×23 滑块：圆点用 `radial-gradient` 画在背景上、靠 `background-position` 从 1px 滑到 19px，选中时底色走 accent 并加一圈 `0 0 12px` 的柔光。
+- **滑条自绘。** `::-webkit-slider-runnable-track` 6px 圆头轨道 + 16px 白色圆点，按下时圆点 `scale(1.12)`。
+- **面板本体。** `border-radius:18px 0 0 18px`（左侧圆角，抽屉推入感）、`box-shadow:-18px 0 48px`、`font:400 13px/1.55 system-ui`。
+- 其余：`.km-btn` 36px / 10px 圆角 / 按压 `scale(.96)` / 聚焦 `outline:2px solid accent`；`.km-input` 与 `select` 同规格，聚焦是「描边换 accent + 3px 柔光」而不是只换边框色；`.km-lib-item` 变成小卡片；`.km-thumb` 52×34；`.km-chip` 28px 高 999px 圆角。
+
+### Fixed
+
+- **折叠箭头两次返工。** 第一版沿用 `▾` 字形，实测 `getBoundingClientRect()` 只有 **4×9px** —— 9px 字号下糊成一个点，各平台字形宽度还不一致。改为两条边框拼的方角（`border-right` + `border-bottom` + `rotate(45deg)`），文字用 `font-size:0` 藏掉。
+  - 第二次返工：同一节后面还有一条 `.km-grpchev{font-size:9px}`，把 `font-size:0` 盖了回去，`▾` 字形重新出现并和边框箭头叠成「斜的小三角」。真机读数确认修前 `fontSize:9px`、修后 `0px`。
+  - 收起态也必须用**同等特异性**重写：旧的 `[data-collapsed="true"] .km-sec-chevron{transform:rotate(-90deg)}` 比新规则高一档，靠后写者胜压不住，会在 45° 上再叠一个 -90°。现在收起态写成 `rotate(-45deg)`（展开 45° − 90°）。
+
+### Verified
+
+真机探针 `tmp\km-0122.mjs` 12 项全绿（`KM0122_PASS`），面板实测：
+
+- `panel`：`w=364 bg=rgba(22,22,24,.49) radius=18px fs=13px`，`font-family` 落到 `system-ui, -apple-system, "Segoe UI"`。
+- `tabbar`：`h=42 br=12px`，三个页签各 `w=107 h=32 fs=12.5px`，选中项带底色与阴影。
+- `sec`：`w=339 br=14px border=1px`，卡片化生效。
+- `checkbox`：`w=40 h=23`，`background-position:19px 50%`（选中态），`radial-gradient` 圆点在位。
+- 尺寸：`bodyScroll 845 = bodyClient 845` —— 比 0.1.23 的 889 又少 44px，卡片 padding 变大但分组折叠把它们抵掉了，背景页签仍一屏装下。壁纸节自身 `h=592`（0.1.23 是 490，多出来的正是卡片内边距）。
+
 ## 0.1.23 — 2026-11-20
 
 0.1.22 的页签只解决了「三类不要互相挤」这一层。实测壁纸那一页自己还有 **1957px**，打开仍要滚两屏 —— 页签把它从四个分区里择出来，却没法让它变短。这一版往下再切一刀：**每个分区内部按小标题分组，默认每组只展开第一组。**
