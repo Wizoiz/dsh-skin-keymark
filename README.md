@@ -483,6 +483,31 @@ const spread = state.ui.spread === true && !prefersReducedTransparency();
 
 **实测（`tmp\km-0122.mjs` 12 项全绿，`KM0122_PASS`）**：面板 `w=364 / radius=18px / fs=13px`；页签条 `h=42 / br=12px`，三个页签各 `w=107 / h=32 / fs=12.5px`；分区卡片 `w=339 / br=14px / border=1px`；开关 `w=40 h=23`、`background-position:19px 50%`。高度 `bodyScroll 845 = bodyClient 845` —— 比 0.1.23 的 889 又少 44px：卡片内边距变大了，但分组折叠把这些多出来的高度抵掉了。
 
+### 输入卡的地板：一个被默认值掩护了很久的常数（v0.1.25）
+
+`--km-card-fill` 原来是这么算的：
+
+```js
+spread ? Math.max(alpha, FROST_CARD_FLOOR_SPREAD) : 1   // 0.78
+```
+
+那个 0.78 与任何设置都无关 —— 它是在默认不透明度 0.55、地板强度 1 的那一档上调出来的。参数一离开那个点就露馅：不透明度拖到 0.08（几乎只剩壁纸）、地板强度拖到 0 之后，画布已经全透、整窗都跟着壁纸走，只有输入卡还硬挺在 `rgba(28,34,45,.78)` 的近黑蓝上。
+
+这类 bug 的坏处不是难看，而是**它只在用户真的把某个滑条推到极端时才出现** —— 而拖到极端恰好是这个面板主要的使用方式。
+
+现在地板分两段缩放：
+
+```js
+const cardFloor = FROST_CARD_FLOOR_SPREAD * floorScale * clamp(alpha / 0.55, 0, 1);
+const cardAlpha = Math.max(alpha + CARD_LIFT_SPREAD * floorScale, cardFloor);
+```
+
+- `floorScale` 在最外层：用户取消地板（=0）时一律归零。
+- `clamp(alpha / 0.55, 0, 1)` 让地板随画布登场：≥0.55 时封顶为 1（**默认观感一个像素不动**），越接近全透越弱。
+- `CARD_LIFT_SPREAD = 0.03` 与侧栏铺开档的 `sideLift` 同量级 —— 地板关掉后卡片仍要实于画布一丁点，否则输入框和正文糊在同一层，光标落点看不清。
+
+写这类「地板/lift」时的通用规矩：**先问它该不该被用户的哪个滑条缩放**。凡是与用户设置无关的常数，迟早会在某个极端档位上暴露成「为什么只有这一块不一样」。
+
 ## 性能与无障碍（v0.1.10 · 2026-11-02）
 
 这一轮全部是「不改外观、只减少无效工作」的改动。四条都有一条共同的判据：**改了之后，用户看得见的像素必须一模一样**。
